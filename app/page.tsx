@@ -25,8 +25,16 @@ function DayView({ user }: { user: User }) {
   const td = today();
 
   useEffect(() => {
-    supabase.from("tasks").select("*").eq("date", td).order("created_at").then(({ data }) => { if (data) setTasks(data as Task[]); });
-  }, []);
+    async function fetchTasks() {
+      supabase.from("tasks")
+      .select("*")
+      .or(`date.eq.${td},done.eq.false`)
+      .eq("user_id", user.id)
+      .order("created_at");
+    if (!error && data) setTasks(data as Task[]);
+  }
+   fetchTasks();
+}, [user.id]);
 
   const pending = tasks.filter(t => !t.done);
   const done    = tasks.filter(t => t.done);
