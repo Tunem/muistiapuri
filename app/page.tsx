@@ -121,12 +121,26 @@ function CalendarView({ user }: { user: User }) {
   const [selected, setSelected] = useState(today());
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ title:"", time:"09:00", color:"pine" as CalEvent["color"] });
+  const [loading, setLoading] = useState(false);
   const td = today();
 
   useEffect(() => {
-    const pfx = `${year}-${String(month+1).padStart(2,"0")}`;
-    supabase.from("events").select("*").gte("date", pfx+"-01").lte("date", pfx+"-31").order("time").then(({ data }) => { if (data) setEvents(data as CalEvent[]); });
-  }, [year, month]);
+    async function fetchEvents() {
+      setLoading(true);
+      const pfx = `${year}-${String(month+1).padStart(2,"0")}`;
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      const { data, error } = await supabase
+        .from("events")
+        .select("*")
+        .eq("user_id", user.id)
+        .gte("date", `${pfx}-01`)
+        .lte("date", `${pfx}-${String(lastDay).padStart(2,"0")}`)
+        .order("time");
+      if (!error && data) setEvents(data as CalEvent[]);
+      setLoading(false);
+    }
+    fetchEvents();
+  }, [year, month, user.id]);
 
   const firstDay  = new Date(year, month, 1);
   const startDow  = (firstDay.getDay() + 6) % 7;
@@ -139,7 +153,11 @@ function CalendarView({ user }: { user: User }) {
 
   async function addEvent() {
     if (!form.title.trim()) return;
-    const { data, error } = await supabase.from("events").insert({ title:form.title.trim(), date:selected, time:form.time, color:form.color, user_id:user.id }).select().single();
+    const { data, error } = await supabase
+    .from("events")
+    .insert({ title:form.title.trim(), date:selected, time:form.time, color:form.color, user_id:user.id })
+    .select()
+    .single();
     if (!error && data) { setEvents(es=>[...es, data as CalEvent]); setForm({title:"",time:"09:00",color:"pine"}); setShowForm(false); }
   }
 
@@ -193,6 +211,7 @@ function CalendarView({ user }: { user: User }) {
               <button onClick={addEvent} style={{ width:"100%", padding:"8px", background:"var(--pine)", color:"#fff", border:"none", borderRadius:6, cursor:"pointer", fontSize:12, fontWeight:700 }}>Tallenna</button>
             </div>
           )}
+          {loading && <p style={{ color:"var(--muted)", fontSize:12, textAlign:"center", padding:"8px 0" }}>Ladataan…</p>}
           {selEvents.length===0
             ? <p style={{ color:"var(--muted)", fontSize:12, textAlign:"center", padding:"16px 0" }}>Ei tapahtumia</p>
             : <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
